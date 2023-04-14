@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
@@ -17,23 +16,17 @@ type service struct {
 	user map[net.Conn]*user
 	mu   sync.Mutex
 	c    chan message
-}
-
-type user struct {
-	name string
-}
-
-type message struct {
-	text    string
-	address string
+	h    os.File
 }
 
 const pathwelcome = "welcome.txt"
+const pathhistory = "history.txt"
 
 func NewService() Service {
 	return &service{
 		user: make(map[net.Conn]*user),
 		c:    make(chan message),
+		h:    os.File{},
 	}
 }
 
@@ -44,7 +37,12 @@ func (s *service) Run(port string) error {
 		return err
 	}
 	defer li.Close()
-
+	h, err := os.Create(pathhistory)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	s.h = *h
 	go s.brodcaster()
 	for {
 		conn, err := li.Accept()
@@ -54,23 +52,4 @@ func (s *service) Run(port string) error {
 		}
 		go s.handleConn(conn)
 	}
-}
-
-func (s *service) handleConn(conn net.Conn) {
-	defer conn.Close()
-	scanner := bufio.NewScanner(conn)
-	file, err := os.ReadFile(pathwelcome)
-	if err != nil {
-		log.Printf("error read file in welcome.txt: %v", err)
-		return
-	}
-	_, err = fmt.Fprint(conn, string(file))
-	if err != nil {
-		log.Println("Couldn't fprint to the user")
-		return
-	}
-	log.Println(scanner.Text())
-}
-
-func (s *service) brodcaster() {
 }
